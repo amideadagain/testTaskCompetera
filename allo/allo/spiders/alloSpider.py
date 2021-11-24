@@ -4,11 +4,11 @@ from ..items import AlloItem
 from datetime import datetime
 import requests
 import json
-from ..read_files import read_csv
 
 
 class AlloSpider(scrapy.Spider):
     name = 'allo_spider'
+    start_urls = ['https://allo.ua/']
     payload = {}
     headers = {
         'authority': 'allo.ua',
@@ -28,10 +28,20 @@ class AlloSpider(scrapy.Spider):
         'accept-language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7,uk;q=0.6',
     }
 
-    def start_requests(self):
-        for category_page in read_csv():
-            print(category_page)
-            yield Request(category_page, callback=self.parse_pages)
+    def parse(self, response):
+        for categories in response.css("div.home-categories.snap-slider a::attr(href)"):
+            yield Request(categories.get(), callback=self.parse_catalog)
+
+    def parse_catalog(self, response):
+        catalog_all = response.xpath(
+            "//h2[@class='portal-category__title' and contains(text(), 'Каталог')]/../..//div[@class='accordion__content']//ul//a/@href")
+        if response.xpath("//h2[@class='portal-category__title' and contains(text(), 'Каталог')]").get() is not None:
+            for catalog in catalog_all:
+                yield Request(catalog.get(), callback=self.parse_catalog)
+        else:
+            page_url = response.xpath("//head//link[@hreflang='uk']/@href").get()
+
+            yield Request(page_url, callback=self.parse_pages)
 
     def parse_pages(self, response):
         for product_url in response.css("div.product-card__img a::attr(href)"):

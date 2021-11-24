@@ -1,11 +1,4 @@
-# Define here the models for your scraped items
-#
-# See documentation in:
-# https://docs.scrapy.org/en/latest/topics/items.html
-
 import scrapy
-from scrapy.loader import ItemLoader
-from itemloaders.processors import MapCompose, TakeFirst
 
 
 def remove_currency(value):
@@ -24,7 +17,3 @@ class AlloItem(scrapy.Item):
     price_regular = scrapy.Field(serializer=remove_currency)
     seller = scrapy.Field()
     special_offers = scrapy.Field()
-
-
-class CategoriesItem(scrapy.Item):
-    category_url = scrapy.Field()
