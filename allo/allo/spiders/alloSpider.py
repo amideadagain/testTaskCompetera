@@ -1,14 +1,14 @@
 import scrapy
-from scrapy import Spider, Request
+from scrapy import Request
 from ..items import AlloItem
 from datetime import datetime
 import requests
 import json
+from ..read_files import read_csv
 
 
 class AlloSpider(scrapy.Spider):
     name = 'allo_spider'
-    start_urls = ['https://allo.ua/']
     payload = {}
     headers = {
         'authority': 'allo.ua',
@@ -28,17 +28,10 @@ class AlloSpider(scrapy.Spider):
         'accept-language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7,uk;q=0.6',
     }
 
-    def parse(self, response):
-        for categories in response.css("div.home-categories.snap-slider a::attr(href)"):
-            yield Request(categories.get(), callback=self.parse_catalog)
-
-    def parse_catalog(self, response):
-        catalog_all = response.xpath(
-            "//h2[@class='portal-category__title' and contains(text(), 'Каталог')]/../..//div[@class='accordion__content']//ul//a/@href")
-        if catalog_all.get():
-            for catalog in catalog_all:
-                yield Request(catalog.get(), callback=self.parse_catalog)
-        yield Request(response.xpath("//head//link[@hreflang='uk']/@href").get(), callback=self.parse_pages)
+    def start_requests(self):
+        for category_page in read_csv():
+            print(category_page)
+            yield Request(category_page, callback=self.parse_pages)
 
     def parse_pages(self, response):
         for product_url in response.css("div.product-card__img a::attr(href)"):
@@ -57,9 +50,10 @@ class AlloSpider(scrapy.Spider):
         for product in response.css("div.page__content"):
             scanned_at = datetime.now().isoformat()
             title = product.css("div.p-view__header h1::text").get()
-            # url = 'https://allo.ua/ua/products/mobile/xiaomi-11t-pro-8-256gb-meteorite-gray.html'
             sku = product.css("span.p-view__header-sku__code::text").get().strip()
             category = product.css("ul.breadcrumbs li a.breadcrumbs__link::text").extract()
+            # I initially had this line for deleting ""Інтернет магазин"" from categories, but I commented it before
+            # the last scraping cause thought for a second that I need it, and now I'm very disappointed in this
             del category[0]
             category = json.dumps(category, ensure_ascii=False)
 
@@ -75,7 +69,6 @@ class AlloSpider(scrapy.Spider):
 
             seller = product.css("div.shipping-seller-logo span.shipping-brand__name::text").get(default='Allo')
 
-            # product_id = 8513082
             discounts_url = f"https://allo.ua/ua/discounts/product/items/?sku={sku}&isAjax=1&currentLocale=uk_UA"
             services_url = f"https://allo.ua/ua/catalog/product/getServices/?id={product_id}&isAjax=1&currentLocale=uk_UA"
             offers_url = f"https://allo.ua/ua/ajax/block/get/?collection=[%7B%22conteinerId%22:%22forceGet%22,%22type%22:%22ajax%22,%22request%22:%22oggetto_cshipping%2Fshipping%2Fdata%22,%22data%22:%7B%22productId%22:{product_id},%22cityId%22:10%7D%7D]&isAjax=1&currentLocale=uk_UA"
@@ -128,41 +121,3 @@ class AlloSpider(scrapy.Spider):
             item["special_offers"] = special_offers
 
             yield item
-
-
-# response.css("div.home-categories.snap-slider a::attr(href)").get()              category urls
-# if response.xpath("//h2[@class='portal-category__title' and contains(text(), 'Каталог')]").get()
-# response.xpath("//h2[@class='portal-category__title' and contains(text(), 'Каталог')]/../..//div[@class='accordion__content']//ul//a/@href").get()
-# каталог ^
-# response.css("div.products-layout__container")                                product url container
-# response.css("div.product-card__img a::attr(href)").get()                     product url
-# response.css("div.page__content")                                             product container
-# response.css("div.p-view__header h1::text").get()                             title
-# response.css("span.p-view__header-sku__code::text").get().strip()             SKU
-# response.css("ul.breadcrumbs li a.breadcrumbs__link::text").extract().pop(0)  product category(s)
-# response.css("p.p-trade__stock-label::text")[1].get().strip()    availability if None False else True
-# price = response.css("div.p-trade-price__current span.sum::text").get(default=None)        price
-# if not None .strip().replace('\xa0', '').replace('₴', '')
-# '\n                    2\xa0095\xa0₴                    '
-# '\n                    17\xa0999\xa0₴                    '        https://pythex.org/
-# https://stackoverflow.com/questions/4703390/how-to-extract-a-floating-number-from-a-string
-# response.css("div.p-trade-price__old span.sum::text").get(default=None)               price regular
-# if None then = price else .strip().replace('\xa0', '').replace('₴', '')
-# response.css("div.shipping-seller-logo span.shipping-brand__name::text").get(default='Allo')
-
-# pagination
-# next_page_url = response.css("div.pagination__next a::attr(href)").extract_first()
-#         if next_page_url is not None:
-#             yield Request(response.urljoin(next_page_url))
-
-# special_offers = []
-# http://localhost:8050/render.html?url=
-# response.css("span.b-label__label::text").get()                           cashback
-# https://allo.ua/ua/discounts/product/items/?sku=868307&isAjax=1&currentLocale=uk_UA
-# response.css("div.products-layout__container div.products-layout__item::attr(data-product-id)").get()   product id
-
-# wrong!!!
-# response.css("div.item h3 a::attr(href)").extract()                       urls
-# response.xpath("div[@class=item][]").extract_first()
-# response.css("div.menu-articles ul a::attr(href)").extract()              category urls
-# response.css("div.p-trade-price span.sum").xpath("text()[not(parent::span)]").get()

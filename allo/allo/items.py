@@ -25,3 +25,6 @@ class AlloItem(scrapy.Item):
     seller = scrapy.Field()
     special_offers = scrapy.Field()
 
+
+class CategoriesItem(scrapy.Item):
+    category_url = scrapy.Field()
